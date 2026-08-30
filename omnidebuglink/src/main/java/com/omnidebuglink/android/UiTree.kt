@@ -54,6 +54,15 @@ internal class UiTree private constructor(private val root: UiEntry) {
                 t.hint?.toString()?.takeIf { it.isNotEmpty() }?.let { p.put("hint", it) }
             }
             view.contentDescription?.toString()?.takeIf { it.isNotEmpty() }?.let { p.put("desc", it) }
+            // 语义状态直接进树：AI 在 traverse 结果里即可校验开关/进度，省一次 view_component 往返
+            (view as? android.widget.CompoundButton)?.let { p.put("checked", it.isChecked) }
+            (view as? android.widget.ProgressBar)?.let {
+                p.put("progress", it.progress).put("max", it.max)
+                try {
+                    p.put("secondaryProgress", it.secondaryProgress)
+                } catch (_: Exception) {
+                }
+            }
             entry.props = p
 
             if (counter[0] < MAX_NODES) {
@@ -154,6 +163,24 @@ internal class UiTree private constructor(private val root: UiEntry) {
         return out
     }
 
+    /** 坐标命中测试：找最深层包含 (x,y) 的可见节点（坐标 = decorView 像素系，与 bounds 同源）。 */
+    fun hitTest(x: Int, y: Int): UiEntry? {
+        fun contains(e: UiEntry): Boolean {
+            val b = e.props.optJSONArray("bounds") ?: return false
+            return x >= b.optInt(0) && y >= b.optInt(1) && x < b.optInt(2) && y < b.optInt(3) &&
+                e.props.optBoolean("visible", true)
+        }
+
+        fun deepest(e: UiEntry): UiEntry? {
+            if (!contains(e)) return null
+            for (c in e.children) {
+                deepest(c)?.let { return it }
+            }
+            return e
+        }
+        return deepest(root)
+    }
+
     fun traverseJson(maxNodes: Int): JSONObject {
         var count = 0
         fun toJson(e: UiEntry): JSONObject {
@@ -186,6 +213,15 @@ internal class UiTree private constructor(private val root: UiEntry) {
         fun summary(): JSONObject {
             val o = JSONObject(props.toString())
             o.put("path", path)
+            return o
+        }
+
+        /** hit 回执摘要：够 AI 判断"事件实际落在谁身上"。 */
+        fun hitSummary(): JSONObject {
+            val o = JSONObject().put("path", path).put("class", props.optString("class"))
+            for (k in listOf("id", "text", "testTag", "checked", "progress")) {
+                if (props.has(k)) o.put(k, props.opt(k))
+            }
             return o
         }
     }

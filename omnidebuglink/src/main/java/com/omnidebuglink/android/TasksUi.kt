@@ -63,7 +63,7 @@ internal object TasksUi {
             val children = JSONArray()
             for (c in entry.children) children.put(c.summary())
             o.put("children", children)
-            entry.view?.let { o.put("fields", reflectFields(it)) }
+            entry.view?.let { o.put("fields", inspectFields(it)) }
             o
         }
 
@@ -213,9 +213,31 @@ internal object TasksUi {
         }
     }
 
-    /** 反射扫 View 的可读字段：无参 getter 返回 String/原始类型，限 30 个，跳过已知冗余项。 */
-    private fun reflectFields(view: View): JSONObject {
+    /**
+     * 语义状态字段优先输出（checked/progress/rating 等），其余反射扫描补齐。
+     * 反射按字母序 ~40 个截断会把这些关键状态挤掉，所以必须显式置前。
+     */
+    private fun inspectFields(view: View): JSONObject {
         val out = JSONObject()
+        try {
+            if (view is android.widget.CompoundButton) out.put("checked", view.isChecked)
+            if (view is android.widget.RatingBar) out.put("rating", view.rating)
+            if (view is android.widget.ProgressBar) {
+                out.put("progress", view.progress).put("max", view.max)
+                try {
+                    out.put("secondaryProgress", view.secondaryProgress)
+                } catch (_: Exception) {
+                    // indeterminate ProgressBar 会抛异常，忽略
+                }
+            }
+        } catch (_: Exception) {
+        }
+        reflectFields(view, out)
+        return out
+    }
+
+    /** 反射扫 View 的可读字段：无参 getter 返回 String/原始类型，追加到 out 已有键之后，上限 30 个新增。 */
+    private fun reflectFields(view: View, out: JSONObject) {
         try {
             var count = 0
             val skip = setOf(
@@ -230,15 +252,16 @@ internal object TasksUi {
                 val rt = m.returnType
                 if (rt != java.lang.String::class.java && !rt.isPrimitive) continue
                 if (m.name == "getId") continue
+                val key = m.name.removePrefix("get").replaceFirstChar { it.lowercaseChar() }
+                if (out.has(key)) continue
                 try {
                     val v = m.invoke(view) ?: continue
-                    out.put(m.name.removePrefix("get").replaceFirstChar { it.lowercaseChar() }, v.toString())
+                    out.put(key, v.toString())
                     count++
                 } catch (_: Exception) {
                 }
             }
         } catch (_: Exception) {
         }
-        return out
     }
 }

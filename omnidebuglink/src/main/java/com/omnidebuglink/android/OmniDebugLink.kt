@@ -22,7 +22,7 @@ import android.util.Log
  */
 object OmniDebugLink {
 
-    const val LibVersion = "0.1.2"
+    const val LibVersion = "0.1.3"
 
     /** 心跳间隔：55s，让服务端 DO 可休眠。 */
     const val HeartbeatMs = 55_000L

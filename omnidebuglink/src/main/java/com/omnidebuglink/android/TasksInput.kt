@@ -34,13 +34,14 @@ internal object TasksInput {
             val x = px(v, p.optDouble("x", -1.0).toFloat(), v.width)
             val y = px(v, p.optDouble("y", -1.0).toFloat(), v.height)
             dispatchTap(v, x, y)
-            JSONObject().put("ok", true).put("px", JSONArray().put(x).put(y))
+            JSONObject().put("ok", true).put("px", JSONArray().put(x).put(y)).put("hit", hitJson(x, y))
         }
 
         registry.register(
             "swipe",
             "Swipes from (from) to (to) over durationMs (default 400), normalized 0..1 coordinates, " +
-                "origin top-left. Intermediate move events are dispatched every ~16ms so scroll/fling inertia works.",
+                "origin top-left. Keep both endpoints near the CENTER of the target control, not its edges. " +
+                "Intermediate move events are dispatched every ~16ms so scroll/fling inertia works.",
             "{\"type\":\"object\",\"required\":[\"from\",\"to\"],\"properties\":{" +
                 "\"from\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"number\"},\"y\":{\"type\":\"number\"}}}," +
                 "\"to\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"number\"},\"y\":{\"type\":\"number\"}}}," +
@@ -56,7 +57,10 @@ internal object TasksInput {
             val y1 = px(v, to.optDouble("y", -1.0).toFloat(), v.height)
             val duration = p.optInt("durationMs", 400).toLong().coerceAtLeast(50)
             dispatchSwipe(v, x0, y0, x1, y1, duration)
-            JSONObject().put("ok", true)
+            JSONObject()
+                .put("ok", true)
+                .put("hitStart", hitJson(x0, y0))
+                .put("hitEnd", hitJson(x1, y1))
         }
 
         registry.register(
@@ -72,7 +76,7 @@ internal object TasksInput {
             val y = px(v, p.optDouble("y", -1.0).toFloat(), v.height)
             val duration = p.optInt("durationMs", 800).toLong().coerceAtLeast(200)
             dispatchSwipe(v, x, y, x, y, duration)
-            JSONObject().put("ok", true)
+            JSONObject().put("ok", true).put("hit", hitJson(x, y))
         }
 
         registry.register(
@@ -89,6 +93,13 @@ internal object TasksInput {
             )
             sendKey(code)
         }
+    }
+
+    /** 落点回执：事件实际落在哪个控件上（坐标命中测试），供 AI 发现"拖 A 动 B"类串扰。 */
+    private fun hitJson(x: Int, y: Int): JSONObject? = try {
+        UiTree.capture().hitTest(x, y)?.hitSummary()
+    } catch (_: Exception) {
+        null
     }
 
     private fun dispatchTap(v: View, x: Int, y: Int) {
