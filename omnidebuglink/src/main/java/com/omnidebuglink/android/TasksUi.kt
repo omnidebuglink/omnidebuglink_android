@@ -120,8 +120,10 @@ internal object TasksUi {
             val view = entry.view
             if (view != null) {
                 if (!view.isEnabled) throw TaskException("NOT_INTERACTABLE", "view is disabled: ${entry.path}")
-                val ok = view.performClick()
-                JSONObject().put("ok", ok).put("via", "performClick")
+                // performClick() 返回值只表示"是否有 OnClickListener 消费"，不代表成败：
+                // Switch/CheckBox 无 listener 时返回 false 但状态照常切换。调用成功即 ok，原值放 handled。
+                val handled = view.performClick()
+                JSONObject().put("ok", true).put("via", "performClick").put("handled", handled)
             } else {
                 val ok = ComposeBridge.performAction(entry, AccessibilityNodeInfo.ACTION_CLICK, null)
                 if (!ok) throw TaskException(
