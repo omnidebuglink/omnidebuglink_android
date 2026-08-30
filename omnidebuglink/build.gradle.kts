@@ -47,5 +47,5 @@ afterEvaluate {
 }
 
 object OmniDebugAndroid {
-    const val version = "0.1.0" // 发版时与 OmniDebugLink.LibVersion 同步 bump
+    const val version = "0.1.1" // 发版时与 OmniDebugLink.LibVersion 同步 bump
 }

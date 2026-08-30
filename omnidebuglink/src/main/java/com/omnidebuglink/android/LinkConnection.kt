@@ -206,6 +206,7 @@ internal class LinkConnection(private val url: String) {
             .put("v", 1)
             .put("type", "result")
             .put("requestId", requestId)
+            .put("ok", true)
         o.put("result", result ?: JSONObject.NULL)
         sendRaw(o.toString())
     }
