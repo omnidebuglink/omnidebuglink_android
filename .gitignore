@@ -4,3 +4,6 @@ build/
 local.properties
 .idea/
 *.iml
+
+# internal dev doc: never publish
+/CLAUDE.md
