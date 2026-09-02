@@ -25,3 +25,7 @@ OmniDebugLink.start(this, "wss://api.omnidebuglink.dev/ws?token=<clientToken>")
 - Custom tasks: `OmniDebugLink.tasks.register("my_task", "description") { payload -> result }`
 
 Notes: the library needs your app to have `INTERNET`; Compose introspection works automatically when your app uses Compose (no extra dependency to add).
+
+## License
+
+Released under the [MIT License](LICENSE).
