@@ -9,7 +9,9 @@ repositories {
     maven { url 'https://jitpack.io' }
 }
 dependencies {
-    implementation 'com.github.omnidebuglink:omnidebuglink_android:v0.2.0'
+    implementation 'com.github.omnidebuglink:omnidebuglink_android:v0.2.2'  // pinned (recommended)
+    // or always the latest release tag:
+    // implementation 'com.github.omnidebuglink:omnidebuglink_android:latest.release'
 }
 ```
 
