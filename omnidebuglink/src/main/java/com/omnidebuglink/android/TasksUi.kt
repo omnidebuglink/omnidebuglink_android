@@ -9,9 +9,34 @@ import org.json.JSONObject
 
 /**
  * UI 观察/操作类 task。path 寻址与 UiTree 一致：view 子索引段 + Compose "#id" 段。
- * 坐标类（tap/swipe）见 TasksInput；这里都是控件级操作。
+ * 坐标类（tap/swipe）见 TasksInput；ui_click 为物理投递（中心点触摸），其余控件级操作。
  */
 internal object TasksUi {
+
+    /**
+     * 物理点击：取 view 中心，在其自己的 window root 上派发完整触摸序列（与 RN 端同法，
+     * Dialog/PopupWindow 中的目标也能正确命中；指引遮罩等覆盖层像真人点击一样收到事件）。
+     * 返回 null 表示坐标不可算（无尺寸/未附着），调用方回退 performClick。
+     */
+    private fun dispatchPhysicalClick(view: View): JSONObject? {
+        if (view.width <= 0 || view.height <= 0 || !view.isAttachedToWindow) return null
+        val root = view.rootView
+        if (root.width <= 0 || root.height <= 0) return null
+        val targetLoc = IntArray(2)
+        view.getLocationOnScreen(targetLoc)
+        val rootLoc = IntArray(2)
+        root.getLocationOnScreen(rootLoc)
+        val cx = (targetLoc[0] - rootLoc[0] + view.width / 2f).toInt()
+        val cy = (targetLoc[1] - rootLoc[1] + view.height / 2f).toInt()
+        TasksInput.dispatchTap(root, cx, cy)
+        return JSONObject()
+            .put("via", "touch")
+            .put("px", JSONArray().put(cx).put(cy))
+            .put(
+                "inDialogWindow",
+                root !== OmniDebugLink.currentActivity()?.window?.decorView
+            )
+    }
 
     fun register(registry: TaskRegistry) {
         registry.register(
@@ -110,8 +135,11 @@ internal object TasksUi {
 
         registry.register(
             "ui_click",
-            "Clicks a control by path: Views get performClick(); Compose nodes go through the accessibility " +
-                "action channel. For locating the path first use find_objects or wait_for.",
+            "Clicks a control by path, delivered physically: a full touch sequence at the view's " +
+                "center, dispatched on its own window root — overlays (guide masks, intercept layers) " +
+                "receive the click exactly like a real tap. Falls back to performClick() when the view " +
+                "has no usable size. Compose nodes go through the accessibility action channel. " +
+                "Locate the path first with find_objects or wait_for.",
             "{\"type\":\"object\",\"required\":[\"path\"],\"properties\":{\"path\":{\"type\":\"string\"}}}"
         ) { p ->
             ensureActionsEnabled("ui_click")
@@ -120,17 +148,23 @@ internal object TasksUi {
             val view = entry.view
             if (view != null) {
                 if (!view.isEnabled) throw TaskException("NOT_INTERACTABLE", "view is disabled: ${entry.path}")
-                // performClick() 返回值只表示"是否有 OnClickListener 消费"，不代表成败：
-                // Switch/CheckBox 无 listener 时返回 false 但状态照常切换。调用成功即 ok，原值放 handled。
-                val handled = view.performClick()
-                JSONObject().put("ok", true).put("via", "performClick").put("handled", handled)
+                val physical = dispatchPhysicalClick(view)
+                if (physical != null) {
+                    physical.put("ok", true).put("path", entry.path)
+                } else {
+                    // performClick() 返回值只表示"是否有 OnClickListener 消费"，不代表成败：
+                    // Switch/CheckBox 无 listener 时返回 false 但状态照常切换。调用成功即 ok，原值放 handled。
+                    val handled = view.performClick()
+                    JSONObject().put("ok", true).put("via", "performClick").put("handled", handled)
+                        .put("path", entry.path)
+                }
             } else {
                 val ok = ComposeBridge.performAction(entry, AccessibilityNodeInfo.ACTION_CLICK, null)
                 if (!ok) throw TaskException(
                     "NOT_INTERACTABLE",
                     "compose node did not accept ACTION_CLICK (missing OnClick semantics?): ${entry.path}"
                 )
-                JSONObject().put("ok", true).put("via", "accessibility")
+                JSONObject().put("ok", true).put("via", "accessibility").put("path", entry.path)
             }
         }
 

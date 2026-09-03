@@ -23,7 +23,7 @@ import java.net.URLEncoder
  */
 object OmniDebugLink {
 
-    const val LibVersion = "0.2.0"
+    const val LibVersion = "0.2.1"
 
     /** 中继地址（写死，调用方只传 token；自建中继改这里重新打包）。 */
     const val RelayUrl = "wss://api.omnidebuglink.dev/ws"

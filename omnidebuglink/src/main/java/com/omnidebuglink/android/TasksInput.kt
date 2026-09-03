@@ -102,7 +102,7 @@ internal object TasksInput {
         null
     }
 
-    private fun dispatchTap(v: View, x: Int, y: Int) {
+    internal fun dispatchTap(v: View, x: Int, y: Int) {
         val now = SystemClock.uptimeMillis()
         v.dispatchTouchEvent(
             MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x.toFloat(), y.toFloat(), 0)
