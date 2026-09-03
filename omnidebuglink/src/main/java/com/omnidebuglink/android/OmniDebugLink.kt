@@ -8,13 +8,14 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import java.net.URLEncoder
 
 /**
  * OmniDebugLink Android 客户端入口。
  *
  * 接入：
  * ```kotlin
- * OmniDebugLink.start(context, "wss://api.omnidebuglink.dev/ws?token=<clientToken>")
+ * OmniDebugLink.start(context, "<clientToken>")
  * OmniDebugLink.stop()
  * ```
  *
@@ -22,7 +23,10 @@ import android.util.Log
  */
 object OmniDebugLink {
 
-    const val LibVersion = "0.1.3"
+    const val LibVersion = "0.2.0"
+
+    /** 中继地址（写死，调用方只传 token；自建中继改这里重新打包）。 */
+    const val RelayUrl = "wss://api.omnidebuglink.dev/ws"
 
     /** 心跳间隔：55s，让服务端 DO 可休眠。 */
     const val HeartbeatMs = 55_000L
@@ -47,7 +51,7 @@ object OmniDebugLink {
     internal var startedAtMs: Long = 0L
     private var started = false
 
-    fun start(context: Context, url: String) {
+    fun start(context: Context, clientToken: String) {
         synchronized(this) {
             if (started) {
                 Log.w(TAG, "already started; call stop() first")
@@ -58,6 +62,7 @@ object OmniDebugLink {
             (appContext as? Application)?.registerActivityLifecycleCallbacks(activityTracker)
                 ?: Log.w(TAG, "context is not an Application; get_state activity stack unavailable")
             startedAtMs = SystemClock.elapsedRealtime()
+            val url = "$RelayUrl?token=${URLEncoder.encode(clientToken, "UTF-8")}"
             connection = LinkConnection(url)
             connection?.start()
             started = true

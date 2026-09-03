@@ -9,7 +9,7 @@ repositories {
     maven { url 'https://jitpack.io' }
 }
 dependencies {
-    implementation 'com.github.omnidebuglink:omnidebuglink_android:v0.1.0'
+    implementation 'com.github.omnidebuglink:omnidebuglink_android:v0.2.0'
 }
 ```
 
@@ -17,7 +17,7 @@ dependencies {
 
 ```kotlin
 // Application.onCreate — one line, that's it
-OmniDebugLink.start(this, "wss://api.omnidebuglink.dev/ws?token=<clientToken>")
+OmniDebugLink.start(this, "<clientToken>")
 ```
 
 - Create a device token pair in the OmniDebugLink console; **one token pair = one device**
