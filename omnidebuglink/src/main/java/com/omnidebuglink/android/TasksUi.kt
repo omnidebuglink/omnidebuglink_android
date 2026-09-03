@@ -135,16 +135,52 @@ internal object TasksUi {
 
         registry.register(
             "ui_click",
-            "Clicks a control by path, delivered physically: a full touch sequence at the view's " +
+            "Clicks a control, delivered physically: a full touch sequence at the view's " +
                 "center, dispatched on its own window root — overlays (guide masks, intercept layers) " +
-                "receive the click exactly like a real tap. Falls back to performClick() when the view " +
-                "has no usable size. Compose nodes go through the accessibility action channel. " +
-                "Locate the path first with find_objects or wait_for.",
-            "{\"type\":\"object\",\"required\":[\"path\"],\"properties\":{\"path\":{\"type\":\"string\"}}}"
+                "receive the click exactly like a real tap. Locate either by path, or directly by " +
+                "text/id/desc/testTag (+index) with the same matching as find_objects — locating and " +
+                "clicking happen atomically in one snapshot. Falls back to performClick() when the " +
+                "view has no usable size; Compose nodes go through the accessibility action channel.",
+            "{\"type\":\"object\",\"properties\":{" +
+                "\"path\":{\"type\":\"string\",\"description\":\"node path from ui_traverse/find_objects\"}," +
+                "\"text\":{\"type\":\"string\",\"description\":\"displayed text substring (case-insensitive), e.g. the label on the button\"}," +
+                "\"id\":{\"type\":\"string\",\"description\":\"view id substring\"}," +
+                "\"desc\":{\"type\":\"string\",\"description\":\"content-description substring\"}," +
+                "\"testTag\":{\"type\":\"string\",\"description\":\"Compose testTag substring\"}," +
+                "\"cls\":{\"type\":\"string\",\"description\":\"view class substring\"}," +
+                "\"index\":{\"type\":\"integer\",\"default\":0,\"description\":\"which match to use when several nodes match\"}" +
+                "}}"
         ) { p ->
             ensureActionsEnabled("ui_click")
             val tree = UiTree.capture()
-            val entry = tree.resolve(p.optString("path"))
+            val path = p.optString("path")
+            val entry = if (path.isNotEmpty()) {
+                tree.resolve(path)
+            } else {
+                val hasFilter = listOf("text", "id", "desc", "testTag", "cls").any { p.has(it) && p.optString(it).isNotEmpty() }
+                if (!hasFilter) throw TaskException(
+                    "BAD_REQUEST",
+                    "provide 'path' or at least one of text/id/desc/testTag/cls (same filters as find_objects)"
+                )
+                val matches = tree.find(
+                    p.optString("text").takeIf { it.isNotEmpty() },
+                    p.optString("id").takeIf { it.isNotEmpty() },
+                    p.optString("desc").takeIf { it.isNotEmpty() },
+                    p.optString("testTag").takeIf { it.isNotEmpty() },
+                    p.optString("cls").takeIf { it.isNotEmpty() },
+                    200
+                )
+                if (matches.isEmpty()) throw TaskException(
+                    "NOT_FOUND",
+                    "no node matches the given filter; run find_objects to see what is on screen"
+                )
+                val index = p.optInt("index", 0)
+                if (index < 0 || index >= matches.size) throw TaskException(
+                    "NOT_FOUND",
+                    "${matches.size} nodes match the filter, index $index is out of range"
+                )
+                matches[index]
+            }
             val view = entry.view
             if (view != null) {
                 if (!view.isEnabled) throw TaskException("NOT_INTERACTABLE", "view is disabled: ${entry.path}")
